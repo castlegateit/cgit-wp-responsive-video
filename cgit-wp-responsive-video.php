@@ -37,7 +37,19 @@ function cgit_wp_responsive_video_embed($html, $url, $args) {
     // Calculate embed ratio
     $width = $args['width'];
     $height = $args['height'];
-    $ratio = $width / $height;
+
+    /**
+     * WordPress seems to return incorrect height and width. Extract them from
+     * the embed code
+     */
+    if (preg_match('%width=\"(\d+)\"%i', $html, $match_width)
+        && preg_match('%height=\"(\d+)\"%i', $html, $match_height)
+    ) {
+        $width = $match_width[1];
+        $height = $match_height[1];
+    }
+
+    $ratio = $height / $width;
 
     // Check the embed matches a supported service and return the embed code
     foreach ($supported as $service) {
@@ -67,7 +79,15 @@ function cgit_wp_responsive_video_enqueue() {
         '1'
     );
 }
+
 add_action('wp_enqueue_scripts', 'cgit_wp_responsive_video_enqueue');
+add_action('admin_enqueue_scripts', 'cgit_wp_responsive_video_enqueue');
+
+function cgit_wp_responsive_video_editor_enqueue() {
+    add_editor_style(plugins_url('css/video-styles.css', __FILE__ ));
+}
+
+add_action('admin_init', 'cgit_wp_responsive_video_editor_enqueue');
 
 
 /**
@@ -107,9 +127,11 @@ function cgit_wp_responsive_video_embed_youtube($code, $ratio) {
 
     $padding = ' style="padding-bottom:' . round($ratio * 100, 2) . '%"';
 
-    $return = '<div class="cgit-wp-responsive-video"' . $padding . '>' . "\n";
+    $return = '<div class="cgit-wp-responsive-video-wrapper">' . "\n";
+    $return.= '<div class="cgit-wp-responsive-video"' . $padding . '>' . "\n";
     $return.= '    <iframe src="//www.youtube.com/embed/';
     $return.= $code . '" frameborder="0" allowfullscreen></iframe>' . "\n";
+    $return.= '</div>';
     $return.= '</div>';
 
     return $return;
@@ -133,7 +155,7 @@ function cgit_wp_responsive_video_detect_vimeo($url) {
 
     if (preg_match($regex, $url, $match)) {
         // Normal link
-        return $match[3];
+        return $match[4];
     }
     else {
         // Embed link
@@ -162,10 +184,13 @@ function cgit_wp_responsive_video_embed_vimeo($code, $ratio) {
 
     $params = '?portrait=0&amp;byline=0&amp;badge=0&amp;color=E70871';
 
-    $return = '<div class="cgit-wp-responsive-video"' . $padding . '>' . "\n";
+    $return = '<div class="cgit-wp-responsive-video-wrapper">' . "\n";
+    $return.= '<div class="cgit-wp-responsive-video"' . $padding . '>' . "\n";
     $return.= '   <iframe src="//player.vimeo.com/video/' . $code . $params;
     $return.= '" frameborder="0" webkitallowfullscreen mozallowfullscreen ';
-    $return.= 'allowfullscreen></iframe>' . "\n" . '</div>';
+    $return.= 'allowfullscreen></iframe>' . "\n";
+    $return.= '</div>';
+    $return.= '</div>';
 
     return $return;
 }
