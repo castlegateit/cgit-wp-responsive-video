@@ -128,7 +128,7 @@ function cgit_wp_responsive_video_embed_youtube($code, $ratio) {
  */
 function cgit_wp_responsive_video_detect_vimeo($url) {
 
-    $regex = '/^(http:\/\/)?(www\.)?vimeo\.com\/([\d]{1,9})$/i';
+    $regex = '/^(http(s)?:\/\/)?(www\.)?vimeo\.com\/([\d]{1,9})$/i';
     $regex_embed = '/player\.vimeo\.com\/video\/([\d]{1,9})"/i';
 
     if (preg_match($regex, $url, $match)) {
