@@ -130,7 +130,7 @@ function cgit_wp_responsive_video_embed_youtube($code, $ratio) {
     $return = '<div class="cgit-wp-responsive-video-wrapper">' . "\n";
     $return.= '<div class="cgit-wp-responsive-video"' . $padding . '>' . "\n";
     $return.= '    <iframe src="//www.youtube.com/embed/';
-    $return.= $code . '" frameborder="0" allowfullscreen></iframe>' . "\n";
+    $return.= $code . '" frameborder="0" allowfullscreen loading="lazy"></iframe>' . "\n";
     $return.= '</div>';
     $return.= '</div>';
 
@@ -188,7 +188,7 @@ function cgit_wp_responsive_video_embed_vimeo($code, $ratio) {
     $return.= '<div class="cgit-wp-responsive-video"' . $padding . '>' . "\n";
     $return.= '   <iframe src="//player.vimeo.com/video/' . $code . $params;
     $return.= '" frameborder="0" webkitallowfullscreen mozallowfullscreen ';
-    $return.= 'allowfullscreen></iframe>' . "\n";
+    $return.= 'allowfullscreen loading="lazy"></iframe>' . "\n";
     $return.= '</div>';
     $return.= '</div>';
 
