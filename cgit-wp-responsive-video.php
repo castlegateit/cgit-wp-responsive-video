@@ -5,7 +5,7 @@
 Plugin Name: Castlegate IT WP Responsive Video
 Plugin URI: http://github.com/castlegateit/cgit-wp-responsive-video
 Description: Embeds videos responsively when embedding in post content.
-Version: 1.1
+Version: 1.2
 Author: Castlegate IT
 Author URI: http://www.castlegateit.co.uk/
 License: MIT
