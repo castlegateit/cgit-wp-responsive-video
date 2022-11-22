@@ -5,7 +5,7 @@
 Plugin Name: Castlegate IT WP Responsive Video
 Plugin URI: http://github.com/castlegateit/cgit-wp-responsive-video
 Description: Embeds videos responsively when embedding in post content.
-Version: 1.2.1
+Version: 1.3.0
 Author: Castlegate IT
 Author URI: http://www.castlegateit.co.uk/
 License: MIT
@@ -45,11 +45,18 @@ function cgit_wp_responsive_video_embed($html, $url, $args) {
     if (preg_match('%width=\"(\d+)\"%i', $html, $match_width)
         && preg_match('%height=\"(\d+)\"%i', $html, $match_height)
     ) {
-        $width = $match_width[1];
-        $height = $match_height[1];
+        $width = (float) $match_width[1];
+        $height = (float) $match_height[1];
     }
 
     $ratio = $height / $width;
+
+    // Get video iframe title
+    $title = null;
+
+    if (preg_match('/ title="(.+?)"/i', $html, $match_title)) {
+        $title = $match_title[1];
+    }
 
     // Check the embed matches a supported service and return the embed code
     foreach ($supported as $service) {
@@ -58,7 +65,7 @@ function cgit_wp_responsive_video_embed($html, $url, $args) {
         $embed = 'cgit_wp_responsive_video_embed_' . $service;
 
         if ($code = $detect($url)) {
-            return $embed($code, $ratio);
+            return $embed($code, $ratio, $title);
         }
     }
 
@@ -123,18 +130,20 @@ function cgit_wp_responsive_video_detect_youtube($url) {
  *
  * @return string HTML embed code
  */
-function cgit_wp_responsive_video_embed_youtube($code, $ratio) {
+function cgit_wp_responsive_video_embed_youtube($code, $ratio, $title = null) {
+    if (is_null($title)) {
+        $title = 'YouTube video';
+    }
 
-    $padding = ' style="padding-bottom:' . round($ratio * 100, 2) . '%"';
+    $attributes = [
+        'src' => "//www.youtube.com/embed/$code",
+        'title' => $title,
+        'frameborder' => '0',
+        'allowfullscreen' => 'allowfullscreen',
+        'loading' => 'lazy',
+    ];
 
-    $return = '<div class="cgit-wp-responsive-video-wrapper">' . "\n";
-    $return.= '<div class="cgit-wp-responsive-video"' . $padding . '>' . "\n";
-    $return.= '    <iframe src="//www.youtube.com/embed/';
-    $return.= $code . '" frameborder="0" allowfullscreen loading="lazy"></iframe>' . "\n";
-    $return.= '</div>';
-    $return.= '</div>';
-
-    return $return;
+    return cgit_responsive_video_wrap($attributes, $ratio);
 }
 
 
@@ -178,19 +187,73 @@ function cgit_wp_responsive_video_detect_vimeo($url) {
  *
  * @return string HTML embed code
  */
-function cgit_wp_responsive_video_embed_vimeo($code, $ratio) {
+function cgit_wp_responsive_video_embed_vimeo($code, $ratio, $title = null) {
+    if (is_null($title)) {
+        $title = 'Vimeo video';
+    }
 
-    $padding = ' style="padding-bottom:' . round($ratio * 100, 2) . '%"';
+    $attributes = [
+        'src' => "//player.vimeo.com/video/$code?portrait=0&amp;byline=0&amp;badge=0&amp;color=E70871",
+        'title' => $title,
+        'style' => "padding-bottom: $padding%;",
+        'frameborder' => '0',
+        'allowfullscreen' => 'allowfullscreen',
+        'loading' => 'lazy',
+    ];
 
-    $params = '?portrait=0&amp;byline=0&amp;badge=0&amp;color=E70871';
+    return cgit_responsive_video_wrap($attributes, $ratio);
+}
 
-    $return = '<div class="cgit-wp-responsive-video-wrapper">' . "\n";
-    $return.= '<div class="cgit-wp-responsive-video"' . $padding . '>' . "\n";
-    $return.= '   <iframe src="//player.vimeo.com/video/' . $code . $params;
-    $return.= '" frameborder="0" webkitallowfullscreen mozallowfullscreen ';
-    $return.= 'allowfullscreen loading="lazy"></iframe>' . "\n";
-    $return.= '</div>';
-    $return.= '</div>';
+/**
+ * Generic responsive video wrapper and iframe
+ *
+ * @param array $attributes
+ * @param float $ratio
+ * @return string
+ */
+function cgit_responsive_video_wrap(array $attributes, float $ratio = null)
+{
+    $padding = 56.25;
 
-    return $return;
+    if (!is_null($ratio)) {
+        $padding = round($ratio * 100, 2);
+    }
+
+    $attributes = array_merge([
+        'allowfullscreen' => 'allowfullscreen',
+        'frameborder' => '0',
+        'loading' => 'lazy',
+    ], $attributes);
+
+    return '<div class="cgit-wp-responsive-video-wrapper modified">'
+        . '<div class="cgit-wp-responsive-video" style="padding-bottom: ' . $padding . '%;">'
+        . '<iframe ' . cgit_responsive_video_attributes($attributes) . '></iframe>'
+        . '</div>'
+        . '</div>';
+}
+
+/**
+ * Convert associative array to attributes
+ *
+ * @param array
+ * @return string
+ */
+function cgit_responsive_video_attributes(array $attributes)
+{
+    $formatted = [];
+
+    foreach ($attributes as $key => $value) {
+        if ($key === $value) {
+            $formatted[] = $key;
+            continue;
+        }
+
+        if (is_array($value)) {
+            $value = implode(' ', $value);
+        }
+
+        $formatted[] = sprintf('%s="%s"', $key, htmlspecialchars($value));
+    }
+
+    return implode(' ', $formatted);
 }
