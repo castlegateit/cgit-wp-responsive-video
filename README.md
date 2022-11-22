@@ -10,3 +10,6 @@ The plugin wraps the embedded media in a container and styles it to maintain the
 
 Simply activate the plugin, and any media embedded in posts will be displayed responsively on front end pages.
 
+## License
+
+Released under the [MIT License](https://opensource.org/licenses/MIT). See [LICENSE](LICENSE) for details.
