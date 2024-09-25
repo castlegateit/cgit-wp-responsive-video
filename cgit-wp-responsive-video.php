@@ -5,7 +5,7 @@
 Plugin Name: Castlegate IT WP Responsive Video
 Plugin URI: http://github.com/castlegateit/cgit-wp-responsive-video
 Description: Embeds videos responsively when embedding in post content.
-Version: 1.4.0
+Version: 1.4.1
 Author: Castlegate IT
 Author URI: http://www.castlegateit.co.uk/
 License: MIT
@@ -143,8 +143,8 @@ function cgit_wp_responsive_video_embed_youtube($code, $ratio, $title = null) {
  */
 function cgit_wp_responsive_video_detect_vimeo($url) {
 
-    $regex = '/^(http(s)?:\/\/)?(www\.)?vimeo\.com\/([\d]{1,9})\/?([a-zA-Z0-9]+)?$/i';
-    $regex_embed = '/player\.vimeo\.com\/video\/([\d]{1,9})"/i';
+    $regex = '/^(http(s)?:\/\/)?(www\.)?vimeo\.com\/([\d]+)\/?([a-zA-Z0-9]+)?$/i';
+    $regex_embed = '/player\.vimeo\.com\/video\/([\d]+)"/i';
 
     if (preg_match($regex, $url, $match)) {
         if (isset($match[5])) {
