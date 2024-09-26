@@ -26,16 +26,18 @@ add_filter('acf/format_value/type=wysiwyg', 'cgit_wp_responsive_video_sanitize_e
  * aspect ratio styles on all video iframe elements.
  *
  * @param string $embed Embed HTML
- * @return string|null
+ * @return string
  */
-function cgit_wp_responsive_video_sanitize_embed(string $embed): ?string
+function cgit_wp_responsive_video_sanitize_embed(string $embed): string
 {
     if ($embed === '') {
-        return null;
+        return '';
     }
 
     $document = new DOMDocument();
+    libxml_use_internal_errors(true);
     $document->loadHTML($embed, LIBXML_HTML_NODEFDTD | LIBXML_HTML_NOIMPLIED);
+    libxml_clear_errors();
 
     foreach ($document->getElementsByTagName('iframe') as $iframe) {
         cgit_wp_responsive_video_sanitize_dom_element_iframe($iframe);
