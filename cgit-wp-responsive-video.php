@@ -5,7 +5,7 @@
 Plugin Name: Castlegate IT WP Responsive Video
 Plugin URI: http://github.com/castlegateit/cgit-wp-responsive-video
 Description: Embeds videos responsively when embedding in post content.
-Version: 1.4.1
+Version: 1.5.0
 Author: Castlegate IT
 Author URI: http://www.castlegateit.co.uk/
 License: MIT
@@ -13,245 +13,123 @@ License: MIT
 */
 
 /**
- * Filters the embed code HTML provided by WordPress to something more
- * appropriate for responsive websites. Detects the embed type and called the
- * specific embed function
- *
- * @param string $html HTML embed code
- * @param string $url  Media URL
- * @param array  $args Array of embed arguments
- *
- * @return string HTML embed code
+ * Filter post content and ACF fields
  */
-function cgit_wp_responsive_video_embed($html, $url, $args) {
-    // Supported embedded services
-    $supported = [
-        'youtube',
-        'vimeo'
+add_filter('the_content', 'cgit_wp_responsive_video_sanitize_embed', 20);
+add_filter('acf/format_value/type=oembed', 'cgit_wp_responsive_video_sanitize_embed', 20);
+add_filter('acf/format_value/type=wysiwyg', 'cgit_wp_responsive_video_sanitize_embed', 20);
+
+/**
+ * Sanitize embed HTML
+ *
+ * Set the lazy loading attribute on all iframe elements. Set width, height, and
+ * aspect ratio styles on all video iframe elements.
+ *
+ * @param string $embed Embed HTML
+ * @return string|null
+ */
+function cgit_wp_responsive_video_sanitize_embed(string $embed): ?string
+{
+    if ($embed === '') {
+        return null;
+    }
+
+    $document = new DOMDocument();
+    $document->loadHTML($embed, LIBXML_HTML_NODEFDTD | LIBXML_HTML_NOIMPLIED);
+
+    foreach ($document->getElementsByTagName('iframe') as $iframe) {
+        cgit_wp_responsive_video_sanitize_dom_element_iframe($iframe);
+    }
+
+    $embed = $document->saveHTML();
+
+    return $embed;
+}
+
+/**
+ * Sanitize iframe DOMElement
+ *
+ * @param DOMElement $element
+ * @return void
+ */
+function cgit_wp_responsive_video_sanitize_dom_element_iframe(DOMElement $element): void
+{
+    // Ignore non-iframe elements
+    if ($element->tagName !== 'iframe') {
+        return;
+    }
+
+    $style = $element->getAttribute('style');
+
+    // Ignore elements that already have a width or aspect ratio
+    if (str_contains($style, 'width:') || str_contains($style, 'aspect-ratio:')) {
+        return;
+    }
+
+    $element->setAttribute('loading', 'lazy');
+    cgit_wp_responsive_video_sanitize_dom_element_iframe_video($element);
+}
+
+/**
+ * Sanitize video iframe DOMElement
+ *
+ * If the aspect ratio can be determined, set appropriate width, height, and
+ * aspect ratio styles.
+ *
+ * @param DOMElement $element
+ * @return void
+ */
+function cgit_wp_responsive_video_sanitize_dom_element_iframe_video(DOMElement $element): void
+{
+    if (!cgit_wp_responsive_video_is_dom_element_iframe_video($element)) {
+        return;
+    }
+
+    $width = (int) $element->getAttribute('width');
+    $height = (int) $element->getAttribute('height');
+    $style = 'height: auto; width: 100%;';
+
+    if ($width && $height) {
+        $style = "aspect-ratio: $width / $height; $style";
+    }
+
+    $element->setAttribute('style', $style);
+}
+
+/**
+ * Is DOMElement a video iframe?
+ *
+ * @param DOMElement $element
+ * @return bool
+ */
+function cgit_wp_responsive_video_is_dom_element_iframe_video(DOMElement $element): bool
+{
+    if ($element->tagName !== 'iframe') {
+        return false;
+    }
+
+    $src = $element->getAttribute('src');
+    $domain = parse_url($src, PHP_URL_HOST);
+
+    if (!is_string($domain)) {
+        return false;
+    }
+
+    $domain = strtolower($domain);
+
+    $video_domains = [
+        'vimeo.com',
+        'youtube.com',
     ];
 
-    // Calculate embed ratio
-    $width = $args['width'];
-    $height = $args['height'];
-
-    /**
-     * WordPress seems to return incorrect height and width. Extract them from
-     * the embed code
-     */
-    if (preg_match('%width=\"(\d+)\"%i', $html, $match_width)
-        && preg_match('%height=\"(\d+)\"%i', $html, $match_height)
-    ) {
-        $width = (float) $match_width[1];
-        $height = (float) $match_height[1];
-    }
-
-    $ratio = $height / $width;
-
-    // Get video iframe title
-    $title = null;
-
-    if (preg_match('/ title="(.+?)"/i', $html, $match_title)) {
-        $title = $match_title[1];
-    }
-
-    // Check the embed matches a supported service and return the embed code
-    foreach ($supported as $service) {
-        $detect = 'cgit_wp_responsive_video_detect_' . $service;
-        $embed = 'cgit_wp_responsive_video_embed_' . $service;
-
-        if ($code = $detect($url)) {
-            return $embed($code, $ratio, $title);
-        }
-    }
-
-    // No support, return unmodified code
-    return $html;
-}
-
-add_filter('embed_oembed_html','cgit_wp_responsive_video_embed', 10, 3);
-
-/**
- * Enqueue the custom styles
- */
-function cgit_wp_responsive_video_enqueue() {
-    wp_enqueue_style(
-        'cgit-wp-responsive-video',
-        plugins_url('css/video-styles.css', __FILE__),
-        '1'
-    );
-}
-
-add_action('wp_enqueue_scripts', 'cgit_wp_responsive_video_enqueue');
-add_action('admin_enqueue_scripts', 'cgit_wp_responsive_video_enqueue');
-
-function cgit_wp_responsive_video_editor_enqueue() {
-    add_editor_style(plugins_url('css/video-styles.css', __FILE__));
-}
-
-add_action('admin_init', 'cgit_wp_responsive_video_editor_enqueue');
-
-/**
- * Takes a media URL and attempts to determine if it is a YouTube video,
- * returning the YouTube ID
- *
- * @param string $url Media URL
- *
- * @return string YouTube ID
- */
-function cgit_wp_responsive_video_detect_youtube($url) {
-    $regex = '%(?:youtube(?:-nocookie)?\.com/(?:[^/]+/.+/|';
-    $regex.= '(?:v|e(?:mbed)?)/|.*[?&]v=)|youtu\.be/)([^"&?/ ]{11})%i';
-
-    if (preg_match($regex, $url, $match)) {
-        return $match[1];
-    }
-
-    return false;
-}
-
-/**
- * Returns YouTube embed code, optimised for responsive code
- *
- * @param string  $code  YouTube ID
- * @param integer $ratio Width/height ratio
- *
- * @return string HTML embed code
- */
-function cgit_wp_responsive_video_embed_youtube($code, $ratio, $title = null) {
-    if (is_null($title)) {
-        $title = 'YouTube video';
-    }
-
-    $attributes = [
-        'src' => "//www.youtube.com/embed/$code",
-        'title' => $title,
-        'frameborder' => '0',
-        'allowfullscreen' => 'allowfullscreen',
-        'loading' => 'lazy',
-    ];
-
-    return cgit_responsive_video_wrap($attributes, $ratio);
-}
-
-/**
- * Takes a media URL and attempts to determine if it is a Vimeo video,
- * returning the Vimeo ID
- *
- * @param string $url Media URL
- *
- * @return string|array Vimeo ID
- */
-function cgit_wp_responsive_video_detect_vimeo($url) {
-
-    $regex = '/^(http(s)?:\/\/)?(www\.)?vimeo\.com\/([\d]+)\/?([a-zA-Z0-9]+)?$/i';
-    $regex_embed = '/player\.vimeo\.com\/video\/([\d]+)"/i';
-
-    if (preg_match($regex, $url, $match)) {
-        if (isset($match[5])) {
-            // Private link
-            return [$match[4], $match[5]];
-        } else {
-            // Normal link
-            return $match[4];
-        }
-    }
-    else {
-        // Embed link
-        if (preg_match($regex_embed, $url, $match)) {
-            return $match[1];
+    foreach ($video_domains as $video_domain) {
+        if (
+            $domain === $video_domain ||
+            str_ends_with($domain, '.' . $video_domain)
+        ) {
+            return true;
         }
     }
 
     return false;
-}
-
-
-/**
- * Returns YouTube embed code, optimised for responsive sites.
- *
- * @param string  $code  Vimeo ID
- * @param integer $ratio Width/height ratio
- *
- * @return string HTML embed code
- */
-function cgit_wp_responsive_video_embed_vimeo($code, $ratio, $title = null) {
-    if (is_null($title)) {
-        $title = 'Vimeo video';
-    }
-
-    $url_params = [
-        'portrait' => 0,
-        'byline' => 0,
-        'badge' => 0,
-        'color' => 'E70871'
-    ];
-
-    // Code may include a private video hash (when an array)
-    if (is_array($code)) {
-        $url_params['h'] = end($code);
-        $code = reset($code);
-    }
-
-    $attributes = [
-        'src' => esc_url("//player.vimeo.com/video/".$code.'?'.http_build_query($url_params)),
-        'title' => $title,
-        'style' => "padding-bottom: $padding%;",
-        'frameborder' => '0',
-        'allowfullscreen' => 'allowfullscreen',
-        'loading' => 'lazy',
-    ];
-
-    return cgit_responsive_video_wrap($attributes, $ratio);
-}
-
-/**
- * Generic responsive video wrapper and iframe
- *
- * @param array $attributes
- * @param float $ratio
- * @return string
- */
-function cgit_responsive_video_wrap(array $attributes, float $ratio = null) {
-    $padding = 56.25;
-
-    if (!is_null($ratio)) {
-        $padding = round($ratio * 100, 2);
-    }
-
-    $attributes = array_merge([
-        'allowfullscreen' => 'allowfullscreen',
-        'frameborder' => '0',
-        'loading' => 'lazy',
-    ], $attributes);
-
-    return '<div class="cgit-wp-responsive-video-wrapper modified">'
-        . '<div class="cgit-wp-responsive-video" style="padding-bottom: ' . $padding . '%;">'
-        . '<iframe ' . cgit_responsive_video_attributes($attributes) . '></iframe>'
-        . '</div>'
-        . '</div>';
-}
-
-/**
- * Convert associative array to attributes
- *
- * @param array
- * @return string
- */
-function cgit_responsive_video_attributes(array $attributes) {
-    $formatted = [];
-
-    foreach ($attributes as $key => $value) {
-        if ($key === $value) {
-            $formatted[] = $key;
-            continue;
-        }
-
-        if (is_array($value)) {
-            $value = implode(' ', $value);
-        }
-
-        $formatted[] = sprintf('%s="%s"', $key, esc_attr($value));
-    }
-
-    return implode(' ', $formatted);
 }
