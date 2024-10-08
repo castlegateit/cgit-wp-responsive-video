@@ -5,7 +5,7 @@
 Plugin Name: Castlegate IT WP Responsive Video
 Plugin URI: http://github.com/castlegateit/cgit-wp-responsive-video
 Description: Embeds videos responsively when embedding in post content.
-Version: 1.5.3
+Version: 1.5.4
 Author: Castlegate IT
 Author URI: http://www.castlegateit.co.uk/
 License: MIT
@@ -39,12 +39,10 @@ function cgit_wp_responsive_video_sanitize_embed(string $embed): string
     // Suppress LibXML HTML5 errors
     libxml_use_internal_errors(true);
 
-    // Ensure the embed string is properly encoded as UTF-8
-    // Prepend XML encoding declaration
-    $utf8_embed = '<?xml encoding="UTF-8">' . $embed;
+    // Add UTF-8 encoding meta tag
+    $embed = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">' . $embed;
 
-    // Load the HTML with the encoding specified
-    $document->loadHTML($utf8_embed, LIBXML_HTML_NODEFDTD | LIBXML_HTML_NOIMPLIED);
+    $document->loadHTML($embed, LIBXML_HTML_NODEFDTD | LIBXML_NOERROR | LIBXML_NOWARNING);
 
     // Clear LibXML HTML5 errors
     libxml_clear_errors();
@@ -63,7 +61,7 @@ function cgit_wp_responsive_video_sanitize_embed(string $embed): string
         }
     }
 
-    return mb_convert_encoding($embed, 'UTF-8', 'HTML-ENTITIES');
+    return $embed;
 }
 
 /**
