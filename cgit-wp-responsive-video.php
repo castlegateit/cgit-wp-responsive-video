@@ -5,7 +5,7 @@
 Plugin Name: Castlegate IT WP Responsive Video
 Plugin URI: http://github.com/castlegateit/cgit-wp-responsive-video
 Description: Embeds videos responsively when embedding in post content.
-Version: 1.5.4
+Version: 1.6.0
 Author: Castlegate IT
 Author URI: http://www.castlegateit.co.uk/
 License: MIT
@@ -15,9 +15,25 @@ License: MIT
 /**
  * Filter post content and ACF fields
  */
-add_filter('the_content', 'cgit_wp_responsive_video_sanitize_embed', 20);
-add_filter('acf/format_value/type=oembed', 'cgit_wp_responsive_video_sanitize_embed', 20);
-add_filter('acf/format_value/type=wysiwyg', 'cgit_wp_responsive_video_sanitize_embed', 20);
+add_filter('the_content', 'cgit_wp_responsive_video_sanitize_html', 20);
+add_filter('acf/format_value/type=oembed', 'cgit_wp_responsive_video_sanitize_html', 20);
+add_filter('acf/format_value/type=wysiwyg', 'cgit_wp_responsive_video_sanitize_html', 20);
+
+/**
+ * Sanitize HTML
+ *
+ * Sanitize iframe elements identified by a regex pattern instead of DOMDocument
+ * to avoid modifying non-iframe elements.
+ *
+ * @param string $content HTML
+ * @return string
+ */
+function cgit_wp_responsive_video_sanitize_html(string $content): string
+{
+    return preg_replace_callback('/<iframe.*?<\/iframe>/i', function ($matches) {
+        return cgit_wp_responsive_video_sanitize_embed($matches[0]);
+    }, $content);
+}
 
 /**
  * Sanitize embed HTML
